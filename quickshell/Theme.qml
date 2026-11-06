@@ -26,7 +26,7 @@ Singleton {
             property string city: ""          // weather city, empty = detect automatically
             property string nightLight: "off" // "off" | "auto" (6 PM–6 AM) | "on"
             property string iconColor: "blue" // "blue" | "accent" (follow the accent colour)
-            property string pinned: "firefox_firefox,org.gnome.Nautilus,org.gnome.TextEditor,kitty"   // rail apps
+            property string pinned: "firefox_firefox,org.gnome.Nautilus,org.gnome.TextEditor,org.gnome.Ptyxis"   // rail apps
         }
     }
 

@@ -34,7 +34,7 @@ if [ "$only_files" = 0 ]; then
   sudo apt update
 
   pkgs=(
-    hyprland quickshell kitty
+    hyprland quickshell ptyxis
     xdg-desktop-portal-hyprland xdg-desktop-portal-gtk
     fonts-inter fonts-jetbrains-mono fonts-noto-core fonts-noto-color-emoji
     grim slurp wl-clipboard cliphist jq curl
