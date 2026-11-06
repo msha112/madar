@@ -11,6 +11,7 @@ import Quickshell.Services.Pipewire
 import Quickshell.Services.UPower
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Shapes
 
 PanelWindow {
     id: cc
@@ -21,10 +22,14 @@ PanelWindow {
     property real closedAt: 0
     property string page: ""          // "" | "wifi" | "bt" | "audio"
 
+    // Restart / Shut down need a second click within 3 s
+    property string armedPower: ""
+    Timer { id: disarmPower; interval: 3000; onTriggered: cc.armedPower = "" }
+
     // ignore a re-open from the same click that just closed it (click outside → on the rail button)
     function toggle() { if (shown) close(); else if (Date.now() - closedAt > 300) open() }
     function open()  { page = ""; shown = true; refresh() }
-    function close() { shown = false; closedAt = Date.now(); btScan.running = false }
+    function close() { shown = false; closedAt = Date.now(); btScan.running = false; armedPower = "" }
     function openPage(p) {
         page = p;
         if (p === "wifi") { wifiList.running = true; wifiRescan.running = true }
@@ -601,6 +606,97 @@ PanelWindow {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: { Hyprland.dispatch("exec gnome-control-center"); cc.close() }
+                    }
+                }
+
+                // Restart · Shut down  (click twice to confirm)
+                Repeater {
+                    model: [
+                        { id: "reboot",   tip: "Restart",   cmd: "systemctl reboot" },
+                        { id: "poweroff", tip: "Shut down", cmd: "systemctl poweroff" }
+                    ]
+                    Rectangle {
+                        id: pwr
+                        required property var modelData
+                        readonly property bool armed: cc.armedPower === modelData.id
+                        implicitWidth: armed ? confirmText.implicitWidth + 24 : 34
+                        implicitHeight: 34
+                        radius: 12
+                        color: armed ? Theme.danger : (pwrMouse.containsMouse ? Theme.active : Theme.raised)
+                        Behavior on color { ColorAnimation { duration: 150 } }
+                        Behavior on implicitWidth { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+
+                        // restart: circular arrow · shut down: power symbol
+                        Shape {
+                            visible: !pwr.armed
+                            anchors.centerIn: parent
+                            width: 18; height: 18
+                            layer.enabled: true
+                            layer.samples: 4
+
+                            // open circle (gap at the top)
+                            ShapePath {
+                                fillColor: "transparent"
+                                strokeColor: Theme.text
+                                strokeWidth: 2
+                                capStyle: ShapePath.RoundCap
+                                PathAngleArc {
+                                    centerX: 9; centerY: 10; radiusX: 6.5; radiusY: 6.5
+                                    startAngle: pwr.modelData.id === "poweroff" ? -55 : -40
+                                    sweepAngle: pwr.modelData.id === "poweroff" ? 290 : 300
+                                }
+                            }
+                            // power: bar through the gap · restart: arrow tip
+                            ShapePath {
+                                fillColor: "transparent"
+                                strokeColor: Theme.text
+                                strokeWidth: 2
+                                capStyle: ShapePath.RoundCap
+                                joinStyle: ShapePath.RoundJoin
+                                startX: pwr.modelData.id === "poweroff" ? 9 : 11.5
+                                startY: pwr.modelData.id === "poweroff" ? 2 : 2.5
+                                PathLine {
+                                    x: pwr.modelData.id === "poweroff" ? 9 : 14.5
+                                    y: pwr.modelData.id === "poweroff" ? 9 : 5.5
+                                }
+                                PathLine {
+                                    x: pwr.modelData.id === "poweroff" ? 9 : 11
+                                    y: pwr.modelData.id === "poweroff" ? 9 : 7.5
+                                }
+                            }
+                        }
+                        Text {
+                            id: confirmText
+                            visible: pwr.armed
+                            anchors.centerIn: parent
+                            text: pwr.modelData.tip + "?"
+                            font.family: Theme.font; font.pixelSize: 12; font.weight: Font.DemiBold
+                            color: Theme.accentInk
+                        }
+
+                        MouseArea {
+                            id: pwrMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                if (pwr.armed) { cc.armedPower = ""; Hyprland.dispatch("exec " + pwr.modelData.cmd); }
+                                else { cc.armedPower = pwr.modelData.id; disarmPower.restart(); }
+                            }
+                        }
+
+                        // tooltip
+                        Rectangle {
+                            visible: pwrMouse.containsMouse && !pwr.armed
+                            anchors.top: parent.bottom
+                            anchors.topMargin: 6
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            implicitWidth: tipText.implicitWidth + 16; implicitHeight: 24; radius: 8
+                            color: Theme.raised
+                            border.color: Theme.panelLine
+                            z: 10
+                            Text { id: tipText; anchors.centerIn: parent; text: pwr.modelData.tip; font.family: Theme.font; font.pixelSize: 11; color: Theme.text }
+                        }
                     }
                 }
             }
