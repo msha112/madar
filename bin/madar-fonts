@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# ─────────────────────────────────────────────────────────────
+#  madar-fonts — bring your Windows fonts over, so Word and Excel
+#  files look exactly the same here as they do on Windows.
+#
+#    madar-fonts                 look for a Windows drive and copy its fonts
+#    madar-fonts <folder>        copy the fonts from a folder (USB, download…)
+#    madar-fonts --list          show the Office fonts you have and the ones missing
+#
+#  Fonts go to ~/.local/share/fonts/windows (only for you, no sudo).
+#  Use fonts from a Windows copy you have a licence for.
+# ─────────────────────────────────────────────────────────────
+set -euo pipefail
+
+dest="$HOME/.local/share/fonts/windows"
+
+ok()   { printf '  \033[32m✓\033[0m %s\n' "$*"; }
+warn() { printf '  \033[31m!\033[0m %s\n' "$*"; }
+
+# Fonts that Word / Excel files from Windows use most (English and Arabic)
+important=(
+  "Calibri" "Calibri Light" "Cambria" "Candara" "Consolas" "Constantia" "Corbel"
+  "Arial" "Times New Roman" "Courier New" "Tahoma" "Verdana" "Georgia"
+  "Segoe UI" "Aptos"
+  "Simplified Arabic" "Traditional Arabic" "Arabic Typesetting"
+  "Sakkal Majalla" "Andalus" "Aldhabi" "Microsoft Uighur"
+)
+
+list_fonts() {
+  echo
+  for f in "${important[@]}"; do
+    real="$(fc-match -f '%{family[0]}' "$f" 2>/dev/null || true)"
+    if [ "$real" = "$f" ]; then ok "$f"
+    else warn "$f  →  shown with: ${real:-?}"; fi
+  done
+  echo
+}
+
+if [ "${1:-}" = "--list" ]; then list_fonts; exit 0; fi
+
+# Where to copy from
+src="${1:-}"
+if [ -z "$src" ]; then
+  for d in /media/"$USER"/*/Windows/Fonts /mnt/*/Windows/Fonts /run/media/"$USER"/*/Windows/Fonts; do
+    [ -d "$d" ] && { src="$d"; break; }
+  done
+  if [ -z "$src" ]; then
+    echo "No Windows drive found."
+    echo "Open the Windows partition in Files first (so it gets mounted), or copy"
+    echo "C:\\Windows\\Fonts to a USB stick, then run:   madar-fonts /path/to/Fonts"
+    exit 1
+  fi
+fi
+[ -d "$src" ] || { echo "Not a folder: $src"; exit 1; }
+
+echo "Copying fonts from: $src"
+mkdir -p "$dest"
+n=0
+while IFS= read -r -d '' f; do
+  name="$(basename "$f")"
+  if [ ! -e "$dest/$name" ]; then
+    cp -- "$f" "$dest/$name"
+    n=$((n + 1))
+  fi
+done < <(find "$src" -maxdepth 2 -type f \( -iname '*.ttf' -o -iname '*.ttc' -o -iname '*.otf' \) -print0)
+ok "$n new font files copied to ~/.local/share/fonts/windows"
+
+fc-cache -f "$dest" >/dev/null 2>&1 || true
+# OnlyOffice keeps its own font list: clear it so it rebuilds on next start
+rm -rf "$HOME/.local/share/onlyoffice/desktopeditors/data/fonts" 2>/dev/null || true
+ok "font cache refreshed — close and reopen OnlyOffice"
+
+list_fonts

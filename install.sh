@@ -44,6 +44,41 @@ if [ "$only_files" = 0 ]; then
   sudo apt install -y "${pkgs[@]}"
   ok "packages installed"
 
+  # ── Office: OnlyOffice + fonts that match Windows ─────────
+  say "Installing OnlyOffice and Office fonts"
+  oo_key=/usr/share/keyrings/onlyoffice.gpg
+  if [ ! -s "$oo_key" ]; then
+    tmpkey="$(mktemp -d)"
+    if gpg --no-default-keyring --keyring "gnupg-ring:$tmpkey/onlyoffice.gpg" \
+           --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys CB2DE8E5 >/dev/null 2>&1; then
+      sudo install -m 644 -o root -g root "$tmpkey/onlyoffice.gpg" "$oo_key"
+    else
+      curl -fsSL https://download.onlyoffice.com/GPG-KEY-ONLYOFFICE | sudo gpg --dearmor -o "$oo_key"
+      sudo chmod 644 "$oo_key"
+    fi
+    rm -rf "$tmpkey"
+  fi
+  echo "deb [signed-by=$oo_key] https://download.onlyoffice.com/repo/debian squeeze main" \
+    | sudo tee /etc/apt/sources.list.d/onlyoffice.list >/dev/null
+
+  # Microsoft's free core fonts (Arial, Times New Roman, Courier New, Verdana…) — accept the licence up front
+  echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" \
+    | sudo debconf-set-selections
+  sudo apt update
+  office_pkgs=(
+    onlyoffice-desktopeditors
+    ttf-mscorefonts-installer
+    fonts-crosextra-carlito fonts-crosextra-caladea fonts-liberation fonts-dejavu
+    fonts-hosny-amiri fonts-sil-scheherazade
+  )
+  have=()
+  for p in "${office_pkgs[@]}"; do
+    if apt-cache policy "$p" 2>/dev/null | grep -q "Candidate: [0-9]"; then have+=("$p")
+    else warn "package $p not found — skipped"; fi
+  done
+  sudo apt install -y "${have[@]}"
+  ok "OnlyOffice and fonts installed"
+
   # Screen brightness needs the video group
   if ! id -nG "$USER" | grep -qw video; then
     sudo usermod -aG video "$USER"
@@ -89,6 +124,31 @@ mkdir -p "$HOME/.config/quickshell"
 cp -a "$here/quickshell/." "$HOME/.config/quickshell/"
 chmod +x "$HOME/.config/quickshell/scripts/"*.sh
 ok "configs in place"
+
+# Office: font tool, "New Document" templates, OnlyOffice defaults
+mkdir -p "$HOME/.local/bin"
+cp -a "$here/bin/madar-fonts" "$HOME/.local/bin/madar-fonts"
+chmod +x "$HOME/.local/bin/madar-fonts"
+
+templates="$(xdg-user-dir TEMPLATES 2>/dev/null || true)"
+{ [ -z "$templates" ] || [ "$templates" = "$HOME" ]; } && templates="$HOME/Templates"
+mkdir -p "$templates"
+for t in "$here/office/templates/"*; do
+  [ -e "$templates/$(basename "$t")" ] || cp -a "$t" "$templates/"
+done
+
+# Only adds settings you haven't chosen yourself — never overwrites them.
+#   UITheme=theme-system  → light/dark follows Madar's day/night
+oo_conf="$HOME/.config/onlyoffice/DesktopEditors.conf"
+mkdir -p "$(dirname "$oo_conf")"
+touch "$oo_conf"
+if ! grep -q '^\[General\]' "$oo_conf"; then
+  { printf '[General]\n'; cat "$oo_conf"; } > "$oo_conf.new" && mv "$oo_conf.new" "$oo_conf"
+fi
+for kv in "UITheme=theme-system" "locale=en-US"; do
+  grep -q "^${kv%%=*}=" "$oo_conf" || sed -i "/^\[General\]/a $kv" "$oo_conf"
+done
+ok "OnlyOffice settings, templates and madar-fonts in place"
 [ -d "$backup" ] && ok "old configs saved in ~/${backup#"$HOME"/}"
 
 # ── 3. Desktop settings ──────────────────────────────────────
@@ -96,6 +156,16 @@ say "Desktop settings"
 fc-cache -f >/dev/null 2>&1 || true
 gsettings set org.gnome.desktop.wm.preferences button-layout 'appmenu:minimize,maximize,close' || true
 xdg-mime default org.gnome.Loupe.desktop image/png image/jpeg image/webp image/gif image/bmp image/svg+xml || true
+if [ -f /usr/share/applications/onlyoffice-desktopeditors.desktop ]; then
+  xdg-mime default onlyoffice-desktopeditors.desktop \
+    application/vnd.openxmlformats-officedocument.wordprocessingml.document \
+    application/msword application/rtf application/vnd.oasis.opendocument.text \
+    application/vnd.openxmlformats-officedocument.spreadsheetml.sheet \
+    application/vnd.ms-excel text/csv application/vnd.oasis.opendocument.spreadsheet \
+    application/vnd.openxmlformats-officedocument.presentationml.presentation \
+    application/vnd.ms-powerpoint application/vnd.oasis.opendocument.presentation || true
+  ok "Word, Excel and PowerPoint files open in OnlyOffice"
+fi
 ok "fonts, window buttons, image viewer"
 
 # ── 4. Reload if we're inside Hyprland ───────────────────────
@@ -110,3 +180,4 @@ fi
 say "Done"
 echo "  Log out, pick \"Hyprland\" from the gear on the login screen, and log in."
 echo "  First time? Reboot once so the brightness permission takes effect."
+echo "  Have Windows? Run  madar-fonts  to copy its fonts, so Office files look identical."

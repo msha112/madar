@@ -16,7 +16,7 @@ Scope {
 
     readonly property var maximized: [
         /chrome/i, /chromium/i, /firefox/i, /brave/i, /edge/i,
-        /nautilus/i, /telegram/i, /^code/i, /cursor/i, /libreoffice/i,
+        /nautilus/i, /telegram/i, /^code/i, /cursor/i, /libreoffice/i, /onlyoffice/i,
         /thunderbird/i, /gimp/i, /inkscape/i, /obsidian/i, /discord/i,
         /slack/i, /whatsapp/i, /spotify/i, /vlc/i, /totem/i, /zoom/i, /teams/i
     ]
