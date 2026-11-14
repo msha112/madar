@@ -106,6 +106,8 @@ quickshell/            the shell → ~/.config/quickshell/
   Notifications.qml    notification server + popups
   WindowRules.qml      how new windows open
   scripts/             snap.sh · max.sh · screenshot.sh
+plugin/                madar-csd: Hyprland plugin — drag windows by their title bar,
+                       resize from edges, minimize button (built by install.sh)
 hypr/hyprland.conf     → ~/.config/hypr/
 config/                fonts + desktop portals
 ISSUES.md              known problems and fixes
@@ -121,7 +123,7 @@ ISSUES.md              known problems and fixes
 ## مشاكل معروفة
 
 موجودة بالتفصيل في [ISSUES.md](ISSUES.md). أهمها:
-- **زرار التصغير اللي جوه البرامج بيجمّدها**، لأن Hyprland مش بيدعم التصغير. صغّر من الشريط الجانبي أو بـ **Super + M**.
+- **السحب من شريط النافذة وزرار التصغير** محتاجين إضافة `madar-csd` اللي في `plugin/`، لأن Hyprland نفسه مش بيدعمهم. سكربت التركيب بيبنيها، ولازم تشغّله تاني بعد أي تحديث لـ Hyprland.
 - **الضغط على إشعار صورة الشاشة مش بيفتحها.** الصورة بتتنسخ وبتتحفظ في `Pictures/Screenshots`.
 
 </div>

@@ -40,6 +40,9 @@ if [ "$only_files" = 0 ]; then
     grim slurp wl-clipboard cliphist jq curl
     brightnessctl playerctl wlsunset
     loupe git
+    # to build the madar-csd plugin (title-bar drag, minimize)
+    hyprland-dev g++ make pkg-config
+    libpixman-1-dev libdrm-dev libinput-dev libudev-dev libwayland-dev libxkbcommon-dev libpango1.0-dev
   )
   sudo apt install -y "${pkgs[@]}"
   ok "packages installed"
@@ -63,7 +66,28 @@ if [ "$only_files" = 0 ]; then
   fi
 fi
 
-# ── 2. Config files (with backup) ────────────────────────────
+# ── 2. Hyprland plugin: title-bar drag, edge resize, minimize ─
+plugin_dir="$HOME/.local/share/madar"
+if pkg-config --exists hyprland 2>/dev/null; then
+  say "Building the madar-csd plugin"
+  build="$(mktemp -d)"
+  cp "$here/plugin/main.cpp" "$here/plugin/Makefile" "$build/"
+  if make -s -C "$build" >"$build/log" 2>&1; then
+    mkdir -p "$plugin_dir"
+    cp "$build/madar-csd.so" "$plugin_dir/madar-csd.so"
+    ok "plugin built"
+  else
+    warn "the plugin didn't build — windows still work, but dragging by the title bar won't."
+    warn "send this log to fix it: $plugin_dir/build.log"
+    mkdir -p "$plugin_dir"
+    cp "$build/log" "$plugin_dir/build.log"
+  fi
+  rm -rf "$build"
+else
+  warn "hyprland-dev isn't installed — run ./install.sh (without --files) to build the plugin"
+fi
+
+# ── 3. Config files (with backup) ────────────────────────────
 say "Copying config files"
 backup="$HOME/.config/madar-backup/$(date +%Y-%m-%d_%H-%M-%S)"
 
@@ -91,7 +115,7 @@ chmod +x "$HOME/.config/quickshell/scripts/"*.sh
 ok "configs in place"
 [ -d "$backup" ] && ok "old configs saved in ~/${backup#"$HOME"/}"
 
-# ── 3. Desktop settings ──────────────────────────────────────
+# ── 4. Desktop settings ──────────────────────────────────────
 say "Desktop settings"
 fc-cache -f >/dev/null 2>&1 || true
 gsettings set org.gnome.desktop.wm.preferences button-layout 'appmenu:minimize,maximize,close' || true
@@ -105,9 +129,14 @@ if [ -f "$src" ]; then
 fi
 ok "fonts, window buttons, image viewer, Settings launcher"
 
-# ── 4. Reload if we're inside Hyprland ───────────────────────
+# ── 5. Reload if we're inside Hyprland ───────────────────────
 if [ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]; then
   hyprctl reload >/dev/null 2>&1 || true
+  if [ -f "$plugin_dir/madar-csd.so" ]; then
+    hyprctl plugin unload "$plugin_dir/madar-csd.so" >/dev/null 2>&1 || true
+    hyprctl plugin load "$plugin_dir/madar-csd.so" >/dev/null 2>&1 \
+      && ok "plugin loaded" || warn "the plugin didn't load (see the message at the top of the screen)"
+  fi
   pkill -x quickshell 2>/dev/null || true
   sleep 1
   hyprctl dispatch exec quickshell >/dev/null 2>&1 || true

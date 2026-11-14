@@ -16,6 +16,8 @@ Open problems to come back to. Newest first.
   - Or open screenshots with a different viewer (e.g. `eog` or `imv`) in `screenshot.sh`.
 
 ## 2. Apps freeze when their own minimize button is pressed
+- **Update 2026-11-14:** the new `plugin/` (madar-csd) handles the minimize request and hides the window in
+  `special:minimized`. Needs testing on the laptop.
 - **Seen:** 2026-11-05
 - **What happens:** pressing the minimize button inside an app (Chrome, Files…) freezes that app.
 - **Why:** Hyprland ignores the app's minimize request and sends no event (checked on socket2: maximize sends `fullscreen>>1/0`, minimize sends nothing). The app thinks it's minimized and stops drawing.
@@ -52,3 +54,9 @@ Open problems to come back to. Newest first.
 ## New windows jumped (opened at one size, then resized)
 - **Fix:** sizes moved from the shell (resizing after the window appeared) to static
   `windowrule … size … center on` rules in `hyprland.conf`, applied before the window is shown.
+
+## Dragging a window by its own title bar did nothing
+- **Cause (checked in the Hyprland 0.53 source):** `protocols/XDGShell.cpp` registers no handler for
+  `xdg_toplevel.move` / `resize`, so apps' title-bar drags and edge resizes are ignored.
+- **Fix:** `plugin/` (madar-csd) adds those handlers and starts Hyprland's own drag/resize; built by
+  `install.sh` against `hyprland-dev`. Must be rebuilt after every Hyprland update (re-run `./install.sh`).
