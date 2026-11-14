@@ -1,10 +1,11 @@
-// Madar — how new windows open
-//   big apps   → large window, centred (maximize with Super + Up or the app's button)
-//   small apps → medium size, centred
-//   calculator & co → their own size, centred
-// Dialogs (Save, Open, Properties…) are left alone.
-// Edit the lists below to change which app goes where (use the app's class:
-// run `hyprctl clients | grep class` while the app is open to see it).
+// Madar — window helpers
+//   · an app's own maximize button → floating-style maximize (scripts/max.sh)
+//   · apps that ask to open maximized (because they were closed that way) open
+//     as a normal window instead
+//   · dragging a maximized window away gives it back its normal size
+// New windows get their size from the window rules in hyprland.conf, applied
+// before they appear, so there's no jump. The lists below are only used to pick
+// the size when undoing an "open maximized" request.
 // Location: ~/.config/quickshell/WindowRules.qml
 import Quickshell
 import Quickshell.Io
@@ -80,6 +81,53 @@ Scope {
         }
     }
 
+    // ── Drag a maximized window away → it goes back to its normal size ──
+    // Hyprland doesn't announce drags, so we watch window positions: quickly while a
+    // maximized window is on screen, slowly otherwise. When a maximized window has
+    // moved and then stays put (you let go), it's restored where you dropped it.
+    property var dragState: ({})     // address → { x, y, moved }
+    property bool anyMax: false
+    Process { id: dropProc }
+    Timer {
+        interval: rules.anyMax ? 150 : 1000
+        running: true
+        repeat: true
+        onTriggered: {
+            rules.checkDrags();
+            Hyprland.refreshToplevels();     // fresh positions for the next tick
+        }
+    }
+    function checkDrags() {
+        const rail = Theme.railWidth;
+        const next = {};
+        let anyFull = false;
+        for (const t of Hyprland.toplevels.values) {
+            const o = t.lastIpcObject;
+            const m = t.monitor;
+            if (!o || !o.at || !m || !o.floating || o.hidden) continue;
+            if ((o.workspace?.name ?? "").startsWith("special")) continue;
+            const mx = m.x, my = m.y, mw = Math.floor(m.width / m.scale), mh = Math.floor(m.height / m.scale);
+            const full = o.size[0] >= mw - rail - 4 && o.size[1] >= mh - 4;
+            if (!full) continue;
+            anyFull = true;
+            const a = Windows.addr(t);
+            const atMax = Math.abs(o.at[0] - (mx + rail)) <= 4 && Math.abs(o.at[1] - my) <= 4;
+            const prev = rules.dragState[a];
+            if (atMax) { next[a] = { x: o.at[0], y: o.at[1], moved: false }; continue; }
+            if (!prev) continue;                                  // full size but never was maximized here
+            const same = prev.x === o.at[0] && prev.y === o.at[1];
+            const stillFor = prev.moved && same ? (prev.still ?? 0) + 1 : 0;
+            if (stillFor >= 2 && !dropProc.running) {           // ~0.3 s without moving = let go
+                dropProc.command = [Quickshell.env("HOME") + "/.config/quickshell/scripts/max.sh", "drop", a];
+                dropProc.running = true;
+                continue;                                         // forget it
+            }
+            next[a] = { x: o.at[0], y: o.at[1], moved: true, still: stillFor };
+        }
+        rules.dragState = next;
+        rules.anyMax = anyFull;
+    }
+
     Connections {
         target: Hyprland
         function onRawEvent(event) {
@@ -101,9 +149,8 @@ Scope {
             r[addr] = { mode: mode, time: now };
             rules.recent = r;
 
-            if (mode === "") return;
-            rules.queue = rules.queue.concat([{ addr: addr, mode: mode }]);
-            settle.restart();
+            // New windows are sized by the window rules in hyprland.conf the moment
+            // they open; here we only undo apps that ask to open maximized (above).
         }
     }
 }

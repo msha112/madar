@@ -605,7 +605,7 @@ PanelWindow {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: { Hyprland.dispatch("exec gnome-control-center"); cc.close() }
+                        onClicked: { Hyprland.dispatch("exec env XDG_CURRENT_DESKTOP=GNOME gnome-control-center"); cc.close() }
                     }
                 }
 

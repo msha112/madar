@@ -8,6 +8,7 @@
 #   max.sh off    [address]
 #   max.sh forget [address]   drop the saved size (after snapping it elsewhere)
 #   max.sh fromapp            an app pressed its own maximize button
+#   max.sh drop   [address]   a maximized window was dragged: back to normal size where it was dropped
 
 mode="${1:-toggle}"
 addr="$2"
@@ -57,6 +58,20 @@ fi
 case "$mode" in
   toggle) [ "$is_max" = 1 ] && mode=off || mode=on ;;
 esac
+
+# "drop": a maximized window was dragged away → give it back its normal size,
+# keeping it where it was dropped (same centre line, same top edge)
+if [ "$mode" = "drop" ]; then
+  if [ -s "$file" ]; then read -r _ _ w h < "$file"; else w=$(( fw * 62 / 100 )); h=$(( fh * 72 / 100 )); fi
+  rm -f "$file"
+  x=$(( cx + (cw - w) / 2 )); y=$cy
+  [ "$x" -lt "$fx" ] && x=$fx
+  [ $(( x + w )) -gt $(( fx + fw )) ] && x=$(( fx + fw - w ))
+  [ "$y" -lt "$fy" ] && y=$fy
+  [ $(( y + h )) -gt $(( fy + fh )) ] && y=$(( fy + fh - h ))
+  hyprctl --batch "dispatch resizewindowpixel exact $w $h,$t ; dispatch movewindowpixel exact $x $y,$t" >/dev/null
+  exit 0
+fi
 
 if [ "$mode" = "on" ]; then
   [ "$is_max" = 1 ] && exit 0

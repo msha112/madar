@@ -44,3 +44,11 @@ Open problems to come back to. Newest first.
 ## Windows on top of a maximized window looked frozen; maximized windows couldn't be dragged
 - **Cause:** Hyprland's own maximize (fullscreen 1) keeps floating windows above it.
 - **Fix:** maximize the floating way — `scripts/max.sh`; app maximize buttons are caught in `WindowRules.qml`.
+
+## Settings (gnome-control-center) didn't open
+- **Fix:** it only starts when it thinks it's on GNOME → launched with `env XDG_CURRENT_DESKTOP=GNOME`;
+  `install.sh` writes a copy of its launcher to `~/.local/share/applications/` with that prefix.
+
+## New windows jumped (opened at one size, then resized)
+- **Fix:** sizes moved from the shell (resizing after the window appeared) to static
+  `windowrule … size … center on` rules in `hyprland.conf`, applied before the window is shown.

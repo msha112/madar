@@ -96,7 +96,14 @@ say "Desktop settings"
 fc-cache -f >/dev/null 2>&1 || true
 gsettings set org.gnome.desktop.wm.preferences button-layout 'appmenu:minimize,maximize,close' || true
 xdg-mime default org.gnome.Loupe.desktop image/png image/jpeg image/webp image/gif image/bmp image/svg+xml || true
-ok "fonts, window buttons, image viewer"
+# GNOME Settings refuses to start outside GNOME: give it a launcher that says it is
+src=/usr/share/applications/org.gnome.Settings.desktop
+if [ -f "$src" ]; then
+  mkdir -p "$HOME/.local/share/applications"
+  sed -e '/^OnlyShowIn=/d' -e 's|^Exec=|Exec=env XDG_CURRENT_DESKTOP=GNOME |' "$src" \
+    > "$HOME/.local/share/applications/org.gnome.Settings.desktop"
+fi
+ok "fonts, window buttons, image viewer, Settings launcher"
 
 # ── 4. Reload if we're inside Hyprland ───────────────────────
 if [ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]; then
