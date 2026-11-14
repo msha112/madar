@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <any>
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <format>
@@ -143,14 +144,19 @@ static void hookWindow(const PHLWINDOW& w) {
     resource->setResize([ref](auto&&...) { beginDrag(ref, true); });
     // maximize button / double-click on the title bar → Madar's floating maximize
     // (scripts/max.sh), so other windows can still come in front of it
+    // We never tell the app it's maximized, so its button always sends "maximize";
+    // each press toggles. "Unmaximize" requests are ignored: apps send them on
+    // their own when their size changes, which undid the maximize right away.
     resource->setSetMaximized([ref](auto&&...) {
+        static auto last = std::chrono::steady_clock::time_point{};
+        const auto  now  = std::chrono::steady_clock::now();
+        if (now - last < std::chrono::milliseconds(500))
+            return;                                  // one press can arrive twice
+        last = now;
         if (const auto win = ref.lock())
             dispatch("exec", "~/.config/quickshell/scripts/max.sh toggle " + addrOf(win));
     });
-    resource->setUnsetMaximized([ref](auto&&...) {
-        if (const auto win = ref.lock())
-            dispatch("exec", "~/.config/quickshell/scripts/max.sh off " + addrOf(win));
-    });
+    resource->setUnsetMaximized([](auto&&...) {});
     resource->setSetMinimized([ref](auto&&...) {
         if (const auto win = ref.lock())
             dispatch("movetoworkspacesilent", "special:minimized,address:" + addrOf(win));
