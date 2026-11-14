@@ -2,7 +2,7 @@
 # Madar on GNOME — step 3: a small shell theme on top of Ubuntu's own (Yaru)
 #   · floating, rounded, see-through top bar
 #   · rounder menus and quick settings
-# Needs the "User Themes" extension. Undo: gsettings reset org.gnome.shell.extensions.user-theme name
+# Needs the "User Themes" extension. The script prints the undo command at the end.
 set -e
 
 theme="$HOME/.local/share/themes/Madar/gnome-shell"
@@ -61,6 +61,15 @@ cat > "$theme/gnome-shell.css" <<CSS
 }
 CSS
 
-gsettings set org.gnome.shell.extensions.user-theme name 'Madar'
+# User Themes installed from Extension Manager keeps its settings schema inside the extension
+gs=(gsettings)
+if ! gsettings list-schemas | grep -qx org.gnome.shell.extensions.user-theme; then
+  dir="$(ls -d "$HOME"/.local/share/gnome-shell/extensions/user-theme@*/schemas 2>/dev/null | head -1)"
+  if [ -z "$dir" ]; then
+    echo "User Themes isn't installed — install it from Extension Manager, then run this again."; exit 1
+  fi
+  gs=(gsettings --schemadir "$dir")
+fi
+"${gs[@]}" set org.gnome.shell.extensions.user-theme name 'Madar'
 echo "Done: Madar shell theme on. Undo with:"
-echo "  gsettings reset org.gnome.shell.extensions.user-theme name"
+echo "  ${gs[*]} reset org.gnome.shell.extensions.user-theme name"
