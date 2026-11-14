@@ -6,6 +6,7 @@
 //
 //    • drag the title bar   → move the window (xdg_toplevel.move)
 //    • drag a window edge   → resize it      (xdg_toplevel.resize)
+//    • maximize button      → fill the screen next to the rail (scripts/max.sh)
 //    • minimize button      → hide the window in special:minimized
 //                             (the Madar side rail shows it dimmed;
 //                              click it there to bring it back)
@@ -140,6 +141,16 @@ static void hookWindow(const PHLWINDOW& w) {
 
     resource->setMove([ref](auto&&...) { beginDrag(ref, false); });
     resource->setResize([ref](auto&&...) { beginDrag(ref, true); });
+    // maximize button / double-click on the title bar → Madar's floating maximize
+    // (scripts/max.sh), so other windows can still come in front of it
+    resource->setSetMaximized([ref](auto&&...) {
+        if (const auto win = ref.lock())
+            dispatch("exec", "~/.config/quickshell/scripts/max.sh toggle " + addrOf(win));
+    });
+    resource->setUnsetMaximized([ref](auto&&...) {
+        if (const auto win = ref.lock())
+            dispatch("exec", "~/.config/quickshell/scripts/max.sh off " + addrOf(win));
+    });
     resource->setSetMinimized([ref](auto&&...) {
         if (const auto win = ref.lock())
             dispatch("movetoworkspacesilent", "special:minimized,address:" + addrOf(win));

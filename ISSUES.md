@@ -16,8 +16,8 @@ Open problems to come back to. Newest first.
   - Or open screenshots with a different viewer (e.g. `eog` or `imv`) in `screenshot.sh`.
 
 ## 2. Apps freeze when their own minimize button is pressed
-- **Update 2026-11-14:** the new `plugin/` (madar-csd) handles the minimize request and hides the window in
-  `special:minimized`. Needs testing on the laptop.
+- **Solved 2026-11-14:** `plugin/` (madar-csd) handles the minimize request and hides the window in
+  `special:minimized`. Confirmed working on the laptop.
 - **Seen:** 2026-11-05
 - **What happens:** pressing the minimize button inside an app (Chrome, Files…) freezes that app.
 - **Why:** Hyprland ignores the app's minimize request and sends no event (checked on socket2: maximize sends `fullscreen>>1/0`, minimize sends nothing). The app thinks it's minimized and stops drawing.
