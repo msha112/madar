@@ -27,8 +27,6 @@
 #include <fstream>
 #include <string>
 
-// a few members we need are private in the headers
-#define private public
 #include <hyprland/src/Compositor.hpp>
 #include <hyprland/src/desktop/view/Window.hpp>
 #include <hyprland/src/managers/KeybindManager.hpp>
@@ -37,7 +35,25 @@
 #include <hyprland/src/helpers/Monitor.hpp>
 #include <hyprland/src/protocols/XDGShell.hpp>
 #include <hyprland/src/plugins/PluginAPI.hpp>
-#undef private
+
+// CXDGToplevelResource keeps the protocol object (m_resource) private. Explicit
+// template instantiation is allowed to name private members, which gives us a
+// member pointer to it without touching the headers.
+struct ToplevelResourceTag {
+    using type = SP<CXdgToplevel> CXDGToplevelResource::*;
+    friend type memberOf(ToplevelResourceTag);
+};
+template <typename Tag, typename Tag::type M>
+struct Expose {
+    friend typename Tag::type memberOf(Tag) {
+        return M;
+    }
+};
+template struct Expose<ToplevelResourceTag, &CXDGToplevelResource::m_resource>;
+
+static SP<CXdgToplevel> protocolObject(const SP<CXDGToplevelResource>& toplevel) {
+    return (*toplevel).*memberOf(ToplevelResourceTag{});
+}
 
 inline HANDLE PHANDLE = nullptr;
 
@@ -114,14 +130,17 @@ static void hookWindow(const PHLWINDOW& w) {
     if (!surface)
         return;
     const auto toplevel = surface->m_toplevel.lock();
-    if (!toplevel || !toplevel->m_resource)
+    if (!toplevel)
+        return;
+    const auto resource = protocolObject(toplevel);
+    if (!resource)
         return;
 
     PHLWINDOWREF ref = w;
 
-    toplevel->m_resource->setMove([ref](auto&&...) { beginDrag(ref, false); });
-    toplevel->m_resource->setResize([ref](auto&&...) { beginDrag(ref, true); });
-    toplevel->m_resource->setSetMinimized([ref](auto&&...) {
+    resource->setMove([ref](auto&&...) { beginDrag(ref, false); });
+    resource->setResize([ref](auto&&...) { beginDrag(ref, true); });
+    resource->setSetMinimized([ref](auto&&...) {
         if (const auto win = ref.lock())
             dispatch("movetoworkspacesilent", "special:minimized,address:" + addrOf(win));
     });
